@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IOC Hash Enrichment</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --text:#f8fafc;
+      --muted:#94a3b8;
+      --blue:#60a5fa;
+      --cyan:#22d3ee;
+      --amber:#fbbf24;
+      --red:#f87171;
+      --green:#34d399;
+    }
+
+    *{
+      font-family:'Inter',sans-serif;
+      box-sizing:border-box;
+    }
+
+    html,body{
+      margin:0;
+      min-height:100vh;
+      width:100%;
+      overflow-x:hidden;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 14% 8%, rgba(59,130,246,.17), transparent 30%),
+        radial-gradient(circle at 86% 3%, rgba(168,85,247,.13), transparent 28%),
+        radial-gradient(circle at 72% 92%, rgba(34,211,238,.08), transparent 25%),
+        linear-gradient(180deg,#05070d 0%,#08111f 54%,#05070d 100%);
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+      background-size:56px 56px;
+      mask-image:radial-gradient(circle at center, black 24%, transparent 82%);
+      -webkit-mask-image:radial-gradient(circle at center, black 24%, transparent 82%);
+    }
+
+    #neuralnet{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      z-index:0;
+      pointer-events:none;
+    }
+
+    .app-shell{
+      position:relative;
+      z-index:2;
+      min-height:100vh;
+    }
+
+    .glass{
+      background:linear-gradient(180deg, rgba(15,23,42,.76), rgba(2,6,23,.62));
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow:0 24px 80px rgba(0,0,0,.28);
+      backdrop-filter:blur(22px);
+      -webkit-backdrop-filter:blur(22px);
+    }
+
+    .panel-card{
+      position:relative;
+      overflow:hidden;
+    }
+
+    .panel-card::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at top left, rgba(96,165,250,.13), transparent 34%),
+        linear-gradient(120deg, transparent, rgba(255,255,255,.035), transparent);
+      opacity:.58;
+      pointer-events:none;
+    }
+
+    .gradient-text{
+      background:linear-gradient(90deg,#60a5fa,#22d3ee,#a78bfa);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+    }
+
+    .drop-zone{
+      border:1px dashed rgba(96,165,250,.35);
+      background:rgba(15,23,42,.45);
+      transition:.2s ease;
+    }
+
+    .drop-zone.dragover{
+      border-color:rgba(34,211,238,.9);
+      background:rgba(34,211,238,.10);
+      box-shadow:0 0 35px rgba(34,211,238,.12);
+    }
+
+    .ioc-text{
+      overflow-wrap:anywhere;
+      word-break:break-word;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+    }
+
+    .table-wrap{
+      width:100%;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    table{
+      width:100%;
+      min-width:1100px;
+      table-layout:fixed;
+      border-collapse:collapse;
+    }
+
+    th,td{
+      padding:14px 12px;
+      text-align:left;
+      vertical-align:top;
+    }
+
+    th{
+      color:#cbd5e1;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.03);
+    }
+
+    td{
+      color:#dbeafe;
+      font-size:13px;
+      border-bottom:1px dashed rgba(255,255,255,.09);
+    }
+  </style>
+</head>
+
+<body>
+<canvas id="neuralnet"></canvas>
+
+<div class="app-shell">
+  <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+
+    <section class="text-center">
+      <div class="mx-auto max-w-5xl">
+        <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[.22em] text-sky-200">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,.9)]"></span>
+          IOC Hash Enrichment
+        </div>
+
+        <h1 class="text-4xl font-black leading-[1.04] tracking-tight sm:text-5xl lg:text-7xl">
+          Enriquecedor de <span class="gradient-text">hashes</span>
+        </h1>
+
+        <p class="mx-auto mt-5 max-w-3xl text-base leading-relaxed text-slate-400 sm:text-lg">
+          Ingresa MD5, SHA1 o SHA256. El sistema consulta primero Maltiverse y luego VirusTotal como fallback para obtener equivalencias y clasificación.
+        </p>
+      </div>
+    </section>
+
+    <section class="mt-10">
+      <div class="panel-card glass rounded-[2rem] p-5 sm:p-6">
+        <div class="relative z-10">
+          <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[.22em] text-slate-500">Carga de indicadores</p>
+              <h2 class="mt-1 text-2xl font-black sm:text-3xl">Subir o pegar hashes</h2>
+              <p class="mt-2 text-sm text-slate-400">
+                Soporta archivos .xlsx, .xls, .csv y .txt, o texto pegado directamente.
+              </p>
+            </div>
+
+            <div id="apiStatus" class="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-bold text-emerald-300">
+              ● Servicio API activo
+            </div>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-[.75fr_1.25fr]">
+            <div>
+              <label for="password" class="mb-2 block text-xs uppercase tracking-[.18em] text-slate-500">Password</label>
+              <input type="password" id="password" placeholder="Password"
+                     class="w-full rounded-2xl border border-white/10 bg-white/[.05] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-400/40">
+
+              <div class="mt-4">
+                <label class="mb-2 block text-xs uppercase tracking-[.18em] text-slate-500">Archivo</label>
+
+                <div id="dropZone" class="drop-zone rounded-2xl p-5 text-center">
+                  <div class="text-3xl">📄</div>
+                  <p class="mt-2 text-sm font-bold text-slate-200">Arrastra un archivo aquí</p>
+                  <p class="mt-1 text-xs text-slate-500">xlsx, xls, csv o txt</p>
+
+                  <label class="mt-4 inline-flex cursor-pointer items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-bold text-sky-200 transition hover:bg-sky-400/15">
+                    Seleccionar archivo
+                    <input id="fileInput" type="file" class="hidden" accept=".xlsx,.xls,.csv,.txt" />
+                  </label>
+
+                  <p id="fileName" class="mt-3 text-xs text-slate-400"></p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label for="iocInput" class="mb-2 block text-xs uppercase tracking-[.18em] text-slate-500">Indicadores</label>
+              <textarea id="iocInput" rows="11"
+                        placeholder="Pega aquí hashes MD5, SHA1 o SHA256 separados por coma, espacio, tabulación o salto de línea."
+                        class="w-full rounded-2xl border border-white/10 bg-white/[.05] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-400/40"></textarea>
+
+              <div class="mt-2 flex flex-col gap-1 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                <span id="iocCount">0 indicadores detectados</span>
+                <span>También puedes arrastrar un archivo sobre esta zona.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col text-sm">
+              <span id="estimate" class="text-slate-400"></span>
+              <span id="timer" class="font-black text-amber-300"></span>
+            </div>
+
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <button onclick="clearAll()" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-white/10">
+                Limpiar
+              </button>
+
+              <button onclick="startAnalysis()" class="inline-flex items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/90 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-300">
+                Analizar hashes →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-8 pb-10">
+      <div class="glass rounded-[2rem] p-5 sm:p-6">
+        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-[.22em] text-slate-500">Resultado</p>
+            <h2 class="mt-1 text-2xl font-black">Detalle de hashes equivalentes</h2>
+            <p class="mt-2 text-sm text-slate-400">
+              Formato de salida: HASH, SHA256, SHA1, MD5, Classification y Modification Time.
+            </p>
+          </div>
+
+          <button onclick="exportXLSX()" class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-bold text-sky-200 transition hover:bg-sky-400/15">
+            Exportar XLSX
+          </button>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-3 mb-5">
+          <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+            <p class="text-xs uppercase tracking-[.18em] text-slate-500">Ingresados</p>
+            <p id="statInput" class="mt-1 text-2xl font-black text-white">0</p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+            <p class="text-xs uppercase tracking-[.18em] text-slate-500">Analizados</p>
+            <p id="statAnalyzed" class="mt-1 text-2xl font-black text-emerald-300">0</p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-white/[.04] p-4">
+            <p class="text-xs uppercase tracking-[.18em] text-slate-500">Encontrados</p>
+            <p id="statFound" class="mt-1 text-2xl font-black text-amber-300">0</p>
+          </div>
+        </div>
+
+        <div class="table-wrap rounded-[1.5rem] border border-white/10 bg-white/[.03]">
+          <table>
+            <colgroup>
+              <col style="width:28%">
+              <col style="width:28%">
+              <col style="width:18%">
+              <col style="width:18%">
+              <col style="width:12%">
+              <col style="width:16%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>HASH</th>
+                <th>SHA256</th>
+                <th>SHA1</th>
+                <th>MD5</th>
+                <th>Classification</th>
+                <th>Modification Time</th>
+              </tr>
+            </thead>
+            <tbody id="results"></tbody>
+          </table>
+        </div>
+
+        <div id="emptyResults" class="mt-6 rounded-[2rem] border border-white/10 bg-white/[.04] p-8 text-center">
+          <div class="text-4xl">🛰️</div>
+          <h3 class="mt-3 text-xl font-black">Sin resultados</h3>
+          <p class="mt-2 text-slate-400">Carga o pega hashes y ejecuta el análisis.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const API_URL = "https://iocvalidator.vercel.app";
+
+let lastResults = [];
+let currentTimer = null;
+
+const HASH_REGEX = /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{64}$/;
+
+const fileInput = document.getElementById("fileInput");
+const dropZone = document.getElementById("dropZone");
+const iocInput = document.getElementById("iocInput");
+
+function parseIndicators(text){
+  return [...new Set(
+    String(text || "")
+      .split(/[\s,;|\t\r\n]+/)
+      .map(x => x.trim())
+      .filter(Boolean)
+      .filter(x => HASH_REGEX.test(x))
+  )];
+}
+
+function updateCount(){
+  const iocs = parseIndicators(iocInput.value);
+  document.getElementById("iocCount").innerText = `${iocs.length} indicadores detectados`;
+  document.getElementById("statInput").innerText = iocs.length;
+}
+
+iocInput.addEventListener("input", updateCount);
+
+async function login(password){
+  const res = await fetch(API_URL + "/api/login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({password})
+  });
+
+  const data = await res.json();
+  return data.token;
+}
+
+function estimate(count){
+  return Math.max(1, Math.ceil(count / 40));
+}
+
+function startTimer(minutes){
+  if(currentTimer) clearInterval(currentTimer);
+
+  let sec = minutes * 60;
+
+  currentTimer = setInterval(() => {
+    sec--;
+
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+
+    document.getElementById("timer").innerText =
+      `Tiempo restante estimado: ${m}:${s.toString().padStart(2,"0")}`;
+
+    if(sec <= 0) clearInterval(currentTimer);
+  }, 1000);
+}
+
+async function startAnalysis(){
+  const password = document.getElementById("password").value;
+  const iocs = parseIndicators(iocInput.value);
+
+  if(!iocs.length){
+    alert("Debes ingresar o subir al menos un hash MD5, SHA1 o SHA256 válido.");
+    return;
+  }
+
+  document.getElementById("estimate").innerText = `Validando acceso...`;
+
+  const token = await login(password);
+  if(!token){
+    document.getElementById("estimate").innerText = "";
+    return alert("Password incorrecta.");
+  }
+
+  const minutes = estimate(iocs.length);
+  document.getElementById("estimate").innerText = `Analizando ${iocs.length} indicadores. Tiempo estimado: ${minutes} min`;
+  startTimer(minutes);
+
+  const res = await fetch(API_URL + "/api/validate-ioc", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":`Bearer ${token}`
+    },
+    body: JSON.stringify({iocs})
+  });
+
+  const data = await res.json();
+
+  if(!res.ok){
+    alert(data?.error || "Error ejecutando análisis.");
+    return;
+  }
+
+  lastResults = data.results || [];
+  render(lastResults);
+
+  document.getElementById("statAnalyzed").innerText = data.analyzed || lastResults.length;
+  document.getElementById("statFound").innerText = lastResults.filter(isFound).length;
+  document.getElementById("estimate").innerText = `Análisis finalizado: ${lastResults.length} resultados.`;
+  document.getElementById("timer").innerText = "";
+}
+
+function isFound(r){
+  return (
+    r.SHA256 !== "Not Found" ||
+    r.SHA1 !== "Not Found" ||
+    r.MD5 !== "Not Found" ||
+    r.Classification !== "Not Found"
+  );
+}
+
+function classificationClass(value){
+  const v = String(value || "").toLowerCase();
+
+  if(v === "malicious") return "text-red-400 font-black";
+  if(v === "suspicious") return "text-yellow-300 font-black";
+  if(v === "benign") return "text-emerald-300 font-black";
+  if(v === "neutral") return "text-blue-300 font-black";
+
+  return "text-slate-400";
+}
+
+function render(results){
+  const table = document.getElementById("results");
+  const empty = document.getElementById("emptyResults");
+
+  table.innerHTML = "";
+
+  if(empty) empty.classList.toggle("hidden", results.length > 0);
+
+  results.forEach(r => {
+    table.innerHTML += `
+      <tr>
+        <td class="ioc-text text-slate-200">${escapeHTML(r.HASH || "Not Found")}</td>
+        <td class="ioc-text">${escapeHTML(r.SHA256 || "Not Found")}</td>
+        <td class="ioc-text">${escapeHTML(r.SHA1 || "Not Found")}</td>
+        <td class="ioc-text">${escapeHTML(r.MD5 || "Not Found")}</td>
+        <td class="${classificationClass(r.Classification)}">${escapeHTML(r.Classification || "Not Found")}</td>
+        <td>${escapeHTML(r["Modification Time"] || "Not Found")}</td>
+      </tr>
+    `;
+  });
+}
+
+function exportXLSX(){
+  if(!lastResults.length){
+    alert("No hay resultados para exportar.");
+    return;
+  }
+
+  const rows = lastResults.map(r => ({
+    HASH: r.HASH || "Not Found",
+    SHA256: r.SHA256 || "Not Found",
+    SHA1: r.SHA1 || "Not Found",
+    MD5: r.MD5 || "Not Found",
+    Classification: r.Classification || "Not Found",
+    "Modification Time": r["Modification Time"] || "Not Found"
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows, {
+    header: ["HASH","SHA256","SHA1","MD5","Classification","Modification Time"]
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "IOC Hashes");
+
+  XLSX.writeFile(wb, `ioc_hash_enrichment_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function clearAll(){
+  iocInput.value = "";
+  fileInput.value = "";
+  document.getElementById("fileName").innerText = "";
+  document.getElementById("estimate").innerText = "";
+  document.getElementById("timer").innerText = "";
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("emptyResults").classList.remove("hidden");
+  lastResults = [];
+
+  document.getElementById("statInput").innerText = "0";
+  document.getElementById("statAnalyzed").innerText = "0";
+  document.getElementById("statFound").innerText = "0";
+
+  updateCount();
+}
+
+async function handleFile(file){
+  if(!file) return;
+
+  const allowed = ["xlsx","xls","csv","txt"];
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  if(!allowed.includes(ext)){
+    alert("Formato no permitido. Usa xlsx, xls, csv o txt.");
+    return;
+  }
+
+  document.getElementById("fileName").innerText = `Archivo cargado: ${file.name}`;
+
+  if(ext === "xlsx" || ext === "xls"){
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type:"array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header:1 });
+
+    const values = rows.flat().map(x => String(x || "").trim()).filter(Boolean);
+    appendIndicators(values.join("\n"));
+    return;
+  }
+
+  const text = await file.text();
+  appendIndicators(text);
+}
+
+function appendIndicators(text){
+  const current = iocInput.value.trim();
+  const incoming = parseIndicators(text).join("\n");
+
+  if(!incoming){
+    alert("No se detectaron hashes válidos en el archivo.");
+    return;
+  }
+
+  iocInput.value = current ? `${current}\n${incoming}` : incoming;
+  updateCount();
+}
+
+fileInput.addEventListener("change", e => {
+  handleFile(e.target.files[0]);
+});
+
+["dragenter","dragover"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+
+  iocInput.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+});
+
+["dragleave","drop"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+  });
+
+  iocInput.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+  });
+});
+
+dropZone.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  handleFile(file);
+});
+
+iocInput.addEventListener("drop", e => {
+  const file = e.dataTransfer.files[0];
+  handleFile(file);
+});
+
+function escapeHTML(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/* Fondo animado */
+(() => {
+  const canvas = document.getElementById("neuralnet");
+  const ctx = canvas.getContext("2d");
+  let W,H,DPR;
+  let nodes = [];
+  const mouse = { x:-9999, y:-9999 };
+
+  function config(){
+    const mobile = window.innerWidth < 768;
+    return {
+      count: mobile ? 38 : 92,
+      distance: mobile ? 112 : 150,
+      speed: mobile ? .18 : .26
+    };
+  }
+
+  function resize(){
+    W = window.innerWidth;
+    H = window.innerHeight;
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    initNodes();
+  }
+
+  function initNodes(){
+    const cfg = config();
+    nodes = Array.from({ length:cfg.count }, () => ({
+      x:Math.random()*W,
+      y:Math.random()*H,
+      vx:(Math.random()-.5)*cfg.speed,
+      vy:(Math.random()-.5)*cfg.speed,
+      r:Math.random()*1.7+.45
+    }));
+  }
+
+  window.addEventListener("resize", resize);
+  window.addEventListener("mousemove", e => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  function draw(){
+    const cfg = config();
+    ctx.clearRect(0,0,W,H);
+
+    for(const n of nodes){
+      n.x += n.vx;
+      n.y += n.vy;
+      if(n.x < -20 || n.x > W + 20) n.vx *= -1;
+      if(n.y < -20 || n.y > H + 20) n.vy *= -1;
+    }
+
+    for(let i=0;i<nodes.length;i++){
+      const a = nodes[i];
+
+      for(let j=i+1;j<nodes.length;j++){
+        const b = nodes[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+
+        if(d < cfg.distance){
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(96,165,250,${(1 - d/cfg.distance) * .09})`;
+          ctx.lineWidth = .55;
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.stroke();
+        }
+      }
+
+      const mdx = a.x - mouse.x;
+      const mdy = a.y - mouse.y;
+      const md = Math.sqrt(mdx*mdx + mdy*mdy);
+
+      if(md < 190){
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(34,211,238,${(1 - md/190) * .18})`;
+        ctx.lineWidth = .7;
+        ctx.moveTo(a.x,a.y);
+        ctx.lineTo(mouse.x,mouse.y);
+        ctx.stroke();
+      }
+    }
+
+    for(const n of nodes){
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(226,232,240,.62)";
+      ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(96,165,250,.045)";
+      ctx.arc(n.x,n.y,n.r*6,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  draw();
+})();
+</script>
+</body>
+</html>
